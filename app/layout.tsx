@@ -2,25 +2,29 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'bongo stores — Good shoes. Good energy.',
-  description: 'Thoughtfully sourced sneakers and slides, delivered across Accra every Saturday.',
-  generator: 'v0.app',
-  icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+  metadataBase: new URL('https://bongostores.netlify.app'),
+  title: {
+    default: 'Bongo Stores — Good shoes. Good energy.',
+    template: '%s | Bongo Stores',
+  },
+  description: 'Thoughtfully sourced sneakers, slides and jerseys delivered across Accra every Saturday.',
+  applicationName: 'Bongo Stores',
+  keywords: ['Bongo Stores', 'sneakers Ghana', 'slides Ghana', 'jerseys Ghana', 'Accra delivery'],
+  authors: [{ name: 'Bongo Stores' }],
+  creator: 'Bongo Stores',
+  publisher: 'Bongo Stores',
+  openGraph: {
+    type: 'website',
+    locale: 'en_GH',
+    url: '/',
+    siteName: 'Bongo Stores',
+    title: 'Bongo Stores — Good shoes. Good energy.',
+    description: 'Thoughtfully sourced sneakers, slides and jerseys delivered across Accra every Saturday.',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Bongo Stores — Good shoes. Good energy.',
+    description: 'Thoughtfully sourced sneakers, slides and jerseys delivered across Accra every Saturday.',
   },
 }
 
@@ -42,3 +46,4 @@ export default function RootLayout({
     </html>
   )
 }
+

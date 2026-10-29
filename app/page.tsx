@@ -1295,7 +1295,8 @@ function Admin({
     [editing, setEditing] = useState<Product | null>(null),
     [chosen, setChosen] = useState<Order | null>(null),
     [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [pendingStatus, setPendingStatus] = useState<Order["status"] | null>(null);
   const actionInProgress = useRef(false);
   useEffect(() => {
     const timer = window.setInterval(
@@ -1338,6 +1339,7 @@ function Admin({
     if (!chosen || actionInProgress.current) return;
     actionInProgress.current = true;
     setBusy(true);
+    setPendingStatus(s);
     try {
       setError("");
       await updateOrder(chosen.id, s);
@@ -1347,6 +1349,7 @@ function Admin({
     } finally {
       actionInProgress.current = false;
       setBusy(false);
+      setPendingStatus(null);
     }
   };
   return (
@@ -1443,6 +1446,7 @@ function Admin({
                 back={() => setChosen(null)}
                 status={status}
                 busy={busy}
+                pendingStatus={pendingStatus}
               />
             ) : (
               <Orders orders={orders} open={setChosen} />
@@ -1892,12 +1896,14 @@ function OrderDetails({
   back,
   status,
   busy,
+  pendingStatus,
 }: {
   order: Order;
   products: Product[];
   back: () => void;
   status: (s: Order["status"]) => Promise<void>;
   busy: boolean;
+  pendingStatus: Order["status"] | null;
 }) {
   const steps: Order["status"][] = ["Paid", "Sourcing", "Ready", "Delivered"];
   return (
@@ -1943,11 +1949,11 @@ function OrderDetails({
                 onClick={() => void status(s)}
                 key={s}
                 disabled={busy}
-                aria-busy={busy && order.status !== s}
+                aria-busy={pendingStatus === s}
                 className={`rounded-xl px-4 py-3 text-left text-sm font-semibold disabled:cursor-wait disabled:opacity-60 ${order.status === s ? "bg-[#e58d54]" : "bg-white/10"}`}
               >
-                {busy && order.status !== s ? <Loader2 className="mr-2 inline animate-spin" size={16} /> : <Check className="mr-2 inline" size={16} />}
-                {busy && order.status !== s ? "Updating…" : s}
+                {pendingStatus === s ? <Loader2 className="mr-2 inline animate-spin" size={16} /> : <Check className="mr-2 inline" size={16} />}
+                {pendingStatus === s ? "Updating…" : s}
               </button>
             ))}
           </div>

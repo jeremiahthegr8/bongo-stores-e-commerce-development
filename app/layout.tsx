@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     description: 'Thoughtfully sourced sneakers, slides and jerseys delivered across Accra every Saturday.',
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: 'Bongo Stores — Good shoes. Good energy.',
     description: 'Thoughtfully sourced sneakers, slides and jerseys delivered across Accra every Saturday.',
   },

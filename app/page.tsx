@@ -1,5 +1,5 @@
 "use client";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -918,18 +918,25 @@ function Checkout({
 }) {
   const [method, setMethod] = useState("Mobile Money");
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const send = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true);
     const x = new FormData(e.currentTarget);
-    await submit({
-      name: String(x.get("name")),
-      phone: String(x.get("phone")),
-      email: String(x.get("email")),
-      address: String(x.get("address")),
-      method,
-    });
-    setBusy(false);
+    try {
+      await submit({
+        name: String(x.get("name")),
+        phone: String(x.get("phone")),
+        email: String(x.get("email")),
+        address: String(x.get("address")),
+        method,
+      });
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
   };
   return (
     <main className="min-h-screen bg-[#fbfaf7] px-4 py-6 sm:px-8">
@@ -1011,10 +1018,14 @@ function Checkout({
             <p className="mt-2 font-serif text-4xl">{money(total)}</p>
             <button
               disabled={busy}
-              className="mt-6 w-full rounded-full bg-[#e58d54] py-3 font-bold disabled:opacity-60"
+              aria-busy={busy}
+              className="mt-6 w-full rounded-full bg-[#e58d54] py-3 font-bold disabled:cursor-wait disabled:opacity-60"
             >
-              {busy ? "Opening payment…" : "Pay securely"}{" "}
-              <ArrowRight className="ml-1 inline" size={17} />
+              {busy ? (
+                <><Loader2 className="mr-2 inline animate-spin" size={17} /> Opening payment…</>
+              ) : (
+                <>Pay securely <ArrowRight className="ml-1 inline" size={17} /></>
+              )}
             </button>
             <p className="mt-4 text-xs text-[#c6d5cb]">
               By paying, you confirm delivery details and Saturday delivery
@@ -1185,19 +1196,31 @@ function Confirmation({
 }
 function Login({ back, success }: { back: () => void; success: () => void }) {
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const signingIn = useRef(false);
   const sign = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (signingIn.current) return;
+    signingIn.current = true;
+    setBusy(true);
     setError("");
     const password = String(
       new FormData(e.currentTarget).get("password") || "",
     );
-    const response = await fetch("/api/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
-    if (response.ok) success();
-    else setError("That password is not correct.");
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (response.ok) success();
+      else setError("That password is not correct.");
+    } catch {
+      setError("We could not sign you in. Check your connection and try again.");
+    } finally {
+      signingIn.current = false;
+      setBusy(false);
+    }
   };
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f3f5f1] px-4">
@@ -1238,8 +1261,12 @@ function Login({ back, success }: { back: () => void; success: () => void }) {
             {error}
           </p>
         )}
-        <button className="mt-6 w-full rounded-full bg-[#1f4d3b] py-3 font-bold text-white">
-          Sign in
+        <button
+          disabled={busy}
+          aria-busy={busy}
+          className="mt-6 w-full rounded-full bg-[#1f4d3b] py-3 font-bold text-white disabled:cursor-wait disabled:opacity-60"
+        >
+          {busy ? <><Loader2 className="mr-2 inline animate-spin" size={17} /> Signing in…</> : "Sign in"}
         </button>
       </form>
     </main>
@@ -1267,7 +1294,9 @@ function Admin({
     >("Dashboard"),
     [editing, setEditing] = useState<Product | null>(null),
     [chosen, setChosen] = useState<Order | null>(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
+  const actionInProgress = useRef(false);
   useEffect(() => {
     const timer = window.setInterval(
       () => void refreshOrders().catch(() => {}),
@@ -1277,30 +1306,47 @@ function Admin({
   }, [refreshOrders]);
   const nav = ["Dashboard", "Products", "Orders", "Notifications"] as const;
   const save = async (p: Product) => {
+    if (actionInProgress.current) return;
+    actionInProgress.current = true;
+    setBusy(true);
     try {
       setError("");
       await saveProduct(p);
       setEditing(null);
     } catch {
       setError("Product could not be saved. Sign in again and retry.");
+    } finally {
+      actionInProgress.current = false;
+      setBusy(false);
     }
   };
   const remove = async (id: number) => {
+    if (actionInProgress.current) return;
+    actionInProgress.current = true;
+    setBusy(true);
     try {
       setError("");
       await removeProduct(id);
     } catch {
       setError("Product could not be removed. Sign in again and retry.");
+    } finally {
+      actionInProgress.current = false;
+      setBusy(false);
     }
   };
   const status = async (s: Order["status"]) => {
-    if (!chosen) return;
+    if (!chosen || actionInProgress.current) return;
+    actionInProgress.current = true;
+    setBusy(true);
     try {
       setError("");
       await updateOrder(chosen.id, s);
       setChosen({ ...chosen, status: s });
     } catch {
       setError("Order status could not be updated. Sign in again and retry.");
+    } finally {
+      actionInProgress.current = false;
+      setBusy(false);
     }
   };
   return (
@@ -1367,6 +1413,7 @@ function Admin({
                 product={editing}
                 cancel={() => setEditing(null)}
                 save={save}
+                busy={busy}
               />
             ) : (
               <Products
@@ -1385,6 +1432,7 @@ function Admin({
                 }
                 edit={setEditing}
                 remove={remove}
+                busy={busy}
               />
             ))}{" "}
           {tab === "Orders" &&
@@ -1394,6 +1442,7 @@ function Admin({
                 products={products}
                 back={() => setChosen(null)}
                 status={status}
+                busy={busy}
               />
             ) : (
               <Orders orders={orders} open={setChosen} />
@@ -1515,11 +1564,13 @@ function Products({
   add,
   edit,
   remove,
+  busy,
 }: {
   products: Product[];
   add: () => void;
   edit: (p: Product) => void;
-  remove: (id: number) => void;
+  remove: (id: number) => Promise<void>;
+  busy: boolean;
 }) {
   return (
     <>
@@ -1532,6 +1583,7 @@ function Products({
         </div>
         <button
           onClick={add}
+          disabled={busy}
           className="rounded-full bg-[#1f4d3b] px-4 py-3 text-sm font-bold text-white"
         >
           <Plus className="mr-1 inline" size={16} /> Add product
@@ -1554,10 +1606,20 @@ function Products({
                 {p.category} · {money(p.price)} · {p.sizes.length} sizes
               </p>
             </div>
-            <button onClick={() => edit(p)} className="p-2 text-[#1f4d3b]">
+            <button
+              onClick={() => edit(p)}
+              disabled={busy}
+              aria-label={`Edit ${p.name || "product"}`}
+              className="p-2 text-[#1f4d3b]"
+            >
               <Pencil size={18} />
             </button>
-            <button onClick={() => remove(p.id)} className="p-2 text-[#9a564e]">
+            <button
+              onClick={() => void remove(p.id)}
+              disabled={busy}
+              aria-label={`Remove ${p.name || "product"}`}
+              className="p-2 text-[#9a564e]"
+            >
               <Trash2 size={18} />
             </button>
           </div>
@@ -1570,30 +1632,39 @@ function ProductForm({
   product,
   cancel,
   save,
+  busy,
 }: {
   product: Product;
   cancel: () => void;
-  save: (p: Product) => void;
+  save: (p: Product) => Promise<void>;
+  busy: boolean;
 }) {
   const [d, setD] = useState(product);
+  const [uploading, setUploading] = useState(false);
   const set = <K extends keyof Product>(key: K, value: Product[K]) =>
     setD((current) => ({ ...current, [key]: value }));
   const upload = async (file?: File) => {
-    if (!file) return;
+    if (!file || uploading || busy) return;
+    setUploading(true);
     const form = new FormData();
     form.append("file", file);
-    const response = await fetch("/api/admin/upload", {
-      method: "POST",
-      body: form,
-    });
-    const payload = await response.json();
-    if (!response.ok || !payload.url)
-      throw new Error(payload.error || "Could not upload image.");
-    set("image", payload.url);
+    try {
+      const response = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: form,
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.url)
+        throw new Error(payload.error || "Could not upload image.");
+      set("image", payload.url);
+    } finally {
+      setUploading(false);
+    }
   };
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
-    save({
+    if (busy || uploading) return;
+    await save({
       ...d,
       id: d.id || Date.now(),
       stock: Object.fromEntries(
@@ -1648,6 +1719,7 @@ function ProductForm({
             type="file"
             accept="image/*"
             onChange={(event) => upload(event.target.files?.[0])}
+            disabled={uploading || busy}
             className="rounded-xl border border-[#dedbd4] px-4 py-2 font-normal"
           />
           <span className="text-xs font-normal text-[#777d75]">
@@ -1713,12 +1785,18 @@ function ProductForm({
           <button
             type="button"
             onClick={cancel}
+            disabled={busy || uploading}
             className="px-5 py-3 font-semibold text-[#6e746d]"
           >
             Cancel
           </button>
-          <button className="rounded-full bg-[#1f4d3b] px-6 py-3 font-bold text-white">
-            Save product
+          <button
+            disabled={busy || uploading}
+            aria-busy={busy || uploading}
+            className="rounded-full bg-[#1f4d3b] px-6 py-3 font-bold text-white disabled:cursor-wait disabled:opacity-60"
+          >
+            {(busy || uploading) && <Loader2 className="mr-2 inline animate-spin" size={17} />}
+            {uploading ? "Uploading photo…" : busy ? "Saving product…" : "Save product"}
           </button>
         </div>
       </div>
@@ -1813,11 +1891,13 @@ function OrderDetails({
   products,
   back,
   status,
+  busy,
 }: {
   order: Order;
   products: Product[];
   back: () => void;
-  status: (s: Order["status"]) => void;
+  status: (s: Order["status"]) => Promise<void>;
+  busy: boolean;
 }) {
   const steps: Order["status"][] = ["Paid", "Sourcing", "Ready", "Delivered"];
   return (
@@ -1860,12 +1940,14 @@ function OrderDetails({
           <div className="mt-5 grid gap-2">
             {steps.map((s) => (
               <button
-                onClick={() => status(s)}
+                onClick={() => void status(s)}
                 key={s}
-                className={`rounded-xl px-4 py-3 text-left text-sm font-semibold ${order.status === s ? "bg-[#e58d54]" : "bg-white/10"}`}
+                disabled={busy}
+                aria-busy={busy && order.status !== s}
+                className={`rounded-xl px-4 py-3 text-left text-sm font-semibold disabled:cursor-wait disabled:opacity-60 ${order.status === s ? "bg-[#e58d54]" : "bg-white/10"}`}
               >
-                <Check className="mr-2 inline" size={16} />
-                {s}
+                {busy && order.status !== s ? <Loader2 className="mr-2 inline animate-spin" size={16} /> : <Check className="mr-2 inline" size={16} />}
+                {busy && order.status !== s ? "Updating…" : s}
               </button>
             ))}
           </div>
@@ -1913,4 +1995,5 @@ function Notifications({ orders }: { orders: Order[] }) {
     </>
   );
 }
+
 

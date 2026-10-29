@@ -1647,6 +1647,40 @@ function ProductForm({
   const [uploading, setUploading] = useState(false);
   const set = <K extends keyof Product>(key: K, value: Product[K]) =>
     setD((current) => ({ ...current, [key]: value }));
+  const sizeOptions: Size[] =
+    d.category === "Jerseys"
+      ? ["S", "M", "L", "XL", "XXL", "3XL"]
+      : [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46];
+  const hasSize = (size: Size) =>
+    d.sizes.some((selected) => String(selected) === String(size));
+  const toggleSize = (size: Size) => {
+    setD((current) => {
+      const selected = current.sizes.some(
+        (existing) => String(existing) === String(size),
+      );
+      if (selected) {
+        const nextStock = { ...current.stock };
+        delete nextStock[String(size)];
+        return {
+          ...current,
+          sizes: current.sizes.filter(
+            (existing) => String(existing) !== String(size),
+          ),
+          stock: nextStock,
+        };
+      }
+      return {
+        ...current,
+        sizes: [...current.sizes, size],
+        stock: { ...current.stock, [String(size)]: current.stock[String(size)] ?? 1 },
+      };
+    });
+  };
+  const setQuantity = (size: Size, quantity: number) =>
+    setD((current) => ({
+      ...current,
+      stock: { ...current.stock, [String(size)]: Math.max(0, quantity || 0) },
+    }));
   const upload = async (file?: File) => {
     if (!file || uploading || busy) return;
     setUploading(true);
@@ -1701,9 +1735,14 @@ function ProductForm({
           Category
           <select
             value={d.category}
-            onChange={(event) =>
-              set("category", event.target.value as Product["category"])
-            }
+            onChange={(event) => {
+              const category = event.target.value as Product["category"];
+              setD((current) =>
+                current.category === category
+                  ? current
+                  : { ...current, category, sizes: [], stock: {} },
+              );
+            }}
             className="rounded-xl border border-[#dedbd4] px-4 py-3 font-normal"
           >
             <option>Sneakers</option>
@@ -1743,48 +1782,72 @@ function ProductForm({
             className="min-h-24 rounded-xl border border-[#dedbd4] px-4 py-3 font-normal"
           />
         </label>
-        <label className="grid gap-2 text-sm font-semibold sm:col-span-2">
-          Available sizes
-          <span className="text-xs font-normal text-[#777d75]">
-            Use UK numbers for footwear, or professional apparel sizes such as
-            S, M, L, XL and XXL for jerseys.
-          </span>
-          <input
-            value={d.sizes.join(", ")}
-            onChange={(event) => {
-              const values = event.target.value
-                .split(",")
-                .map((value) => value.trim())
-                .filter(Boolean);
-              set(
-                "sizes",
-                d.category === "Jerseys"
-                  ? values.map((value) => value.toUpperCase())
-                  : values.map(Number).filter(Boolean),
+        <section className="sm:col-span-2">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold">Sizes & stock</h2>
+              <p className="mt-1 text-xs text-[#777d75]">
+                Select each available size, then set exactly how many you have.
+              </p>
+            </div>
+            <span className="rounded-full bg-[#e9f0e9] px-3 py-1 text-xs font-semibold text-[#1f4d3b]">
+              {d.sizes.length} selected
+            </span>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {sizeOptions.map((size) => {
+              const selected = hasSize(size);
+              return (
+                <button
+                  type="button"
+                  key={size}
+                  onClick={() => toggleSize(size)}
+                  aria-pressed={selected}
+                  className={`min-w-12 rounded-xl border px-4 py-2.5 text-sm font-bold ${selected ? "border-[#1f4d3b] bg-[#1f4d3b] text-white" : "border-[#dedbd4] bg-[#fbfaf7] text-[#525850]"}`}
+                >
+                  {d.category === "Jerseys" ? size : `UK ${size}`}
+                </button>
               );
-            }}
-            className="rounded-xl border border-[#dedbd4] px-4 py-3 font-normal"
-          />
-        </label>
-        <div className="grid gap-3 sm:col-span-2 sm:grid-cols-4">
-          {d.sizes.map((size) => (
-            <label key={size} className="grid gap-1 text-xs font-semibold">
-              {d.category === "Jerseys" ? `Size ${size}` : `UK ${size}`} stock
-              <input
-                type="number"
-                min="0"
-                value={d.stock[size] ?? 1}
-                onChange={(event) =>
-                  set("stock", {
-                    ...d.stock,
-                    [size]: Number(event.target.value),
-                  })
-                }
-                className="rounded-lg border border-[#dedbd4] px-3 py-2 font-normal"
-              />
-            </label>
-          ))}
-        </div>
+            })}
+          </div>
+          {d.sizes.length ? (
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {d.sizes.map((size) => (
+                <div
+                  key={size}
+                  className="flex items-center gap-3 rounded-2xl border border-[#dedbd4] bg-[#fbfaf7] p-3"
+                >
+                  <span className="min-w-12 font-semibold text-[#1f4d3b]">
+                    {d.category === "Jerseys" ? size : `UK ${size}`}
+                  </span>
+                  <label className="min-w-0 flex-1 text-xs font-semibold text-[#6e746d]">
+                    Quantity
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      value={d.stock[String(size)] ?? 1}
+                      onChange={(event) => setQuantity(size, Number(event.target.value))}
+                      className="mt-1 w-full rounded-lg border border-[#dedbd4] bg-white px-3 py-2 text-sm font-semibold text-[#20221f]"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => toggleSize(size)}
+                    aria-label={`Remove ${d.category === "Jerseys" ? size : `UK ${size}`}`}
+                    className="self-end rounded-lg p-2 text-[#9a564e]"
+                  >
+                    <X size={17} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 rounded-xl bg-[#f5f5f1] px-4 py-3 text-sm text-[#6e746d]">
+              No sizes selected yet. Tap a size above to add it to this product.
+            </p>
+          )}
+        </section>
         <div className="sm:col-span-2 flex justify-end gap-3">
           <button
             type="button"
